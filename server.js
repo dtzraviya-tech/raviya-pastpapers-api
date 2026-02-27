@@ -1,35 +1,85 @@
 const express = require('express');
-const { generateImage } = require('./scraper');
+const { PastPapersScraper, CREATOR } = require('./scraper');
 
 const app = express();
 app.use(express.json());
 
+const scraper = new PastPapersScraper();
+
+const asciiArt = `
+  _____            _               _    ____ _____ 
+ |  __ \\          (_)             | |  / __ \\_   _|
+ | |__) |__ ___   ___   _  __ _   | | | |  | || |  
+ |  _  // _\` \\ \\ / / | | |/ _\` |  | | | |  | || |  
+ | | \\ \\ (_| |\\ V /| | |_| (_| |  | | | |__| || |_ 
+ |_|  \\_\\__,_| \\_/ |_|\\__, |\\__,_|  |_|  \\____/_____|
+                       __/ |                       
+                      |___/  Created by @Raviya
+`;
+
+// Home Route
 app.get('/', (req, res) => {
     res.json({
-        message: "RAVIYA Zoner AI API",
-        creator: "@Raviya",
-        status: "Public",
-        endpoints: { generate: "/api/text2img?prompt=cat&size=1024x1024" }
+        message: "RAVIYA Past Papers API",
+        creator: CREATOR,
+        status: "Public (No API Key Required)",
+        endpoints: { 
+            search: "/api/search?q=maths&page=1",
+            recent: "/api/recent?page=1",
+            details: "/api/details?url=paper_url",
+            download: "/api/download?url=direct_file_url_here" 
+        }
     });
 });
 
-app.get('/api/text2img', async (req, res) => {
-    const prompt = req.query.prompt || req.query.q;
-    const size = req.query.size || "1024x1024";
+// Search Endpoint
+app.get('/api/search', async (req, res) => {
+    const q = req.query.q || req.query.text;
+    const page = req.query.page || 1;
     
-    if (!prompt) {
-        return res.status(400).json({ status: false, creator: "@Raviya", message: "Query parameter 'prompt' is missing!" });
+    if (!q) {
+        return res.status(400).json({ status: false, creator: CREATOR, message: "Query parameter 'q' is missing!" });
     }
 
-    try {
-        const result = await generateImage(prompt, size);
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ status: false, creator: "@Raviya", message: error.message || "Server Error" });
+    const result = await scraper.searchPapers(q, page);
+    res.json(result);
+});
+
+// Recent Papers Endpoint
+app.get('/api/recent', async (req, res) => {
+    const page = req.query.page || 1;
+    const result = await scraper.getRecentPapers(page);
+    res.json(result);
+});
+
+// Paper Details Endpoint
+app.get('/api/details', async (req, res) => {
+    const url = req.query.url;
+    
+    if (!url) {
+        return res.status(400).json({ status: false, creator: CREATOR, message: "Query parameter 'url' is missing!" });
     }
+
+    const result = await scraper.getPaperDetails(url);
+    res.json(result);
+});
+
+// Download Endpoint
+app.get('/api/download', async (req, res) => {
+    const url = req.query.url;
+    
+    if (!url) {
+        return res.status(400).json({ status: false, creator: CREATOR, message: "Query parameter 'url' is missing! Give a direct PDF/ZIP url." });
+    }
+    
+    await scraper.downloadStream(url, res);
 });
 
 if (process.env.NODE_ENV !== 'production') {
-    app.listen(3000, () => console.log(`✅ Zoner AI API running on port 3000`));
+    app.listen(3000, () => {
+        console.log('\x1b[36m%s\x1b[0m', asciiArt);
+        console.log(`✅ API running on port 3000`);
+    });
 }
+
 module.exports = app;
